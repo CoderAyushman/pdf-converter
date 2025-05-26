@@ -1,21 +1,28 @@
 "use strict";
-
 var express = require("express");
 var path = require("path");
 var cookieParser = require("cookie-parser");
 var logger = require("morgan");
-const port = 4200;
+const port = process.env.PORT || 4000;
 const multer = require("multer");
 const fs = require("fs").promises;
 var app = express();
 const libre = require("libreoffice-convert");
 const cors = require("cors");
+const { error } = require("console");
+const fileConverter = require("./components/fileConverter");
 libre.convertAsync = require("util").promisify(libre.convert);
 // view engine setup
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
 
-app.use(cors());
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 app.use(logger("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -31,69 +38,147 @@ const storage = multer.diskStorage({
     cb(null, "./upload");
   },
   filename: function (req, file, cb) {
-    cb(null, `${Date.now()}-${file.originalname}`);
+    cb(
+      null,
+      `${path.basename(
+        file.originalname,
+        path.extname(file.originalname)
+      )}_${Date.now()}${path.extname(file.originalname)}`
+    );
   },
 });
 const upload = multer({ storage: storage });
+// let filepath;
+// let filename;
+// let inputFilePath;
 
-let filepath;
-let filename;
-let inputFilePath;
+app.post("/upload", upload.array("files"), async (req, res) => {
+  // console.log(req.body);
 
-app.post("/upload", upload.single("wordFile"), async (req, res) => {
-  console.log(req.body);
-
-  console.log(req.file);
+  // console.log(req.files);
 
   try {
-    const ext = ".pdf";
-    const inputPath = path.join(__dirname, `/upload/${req.file.filename}`);
-    const outputPath = path.join(
-      __dirname,
-      `/download/${req.file.filename}${ext}`
-    );
-    filepath = outputPath;
-    filename = `${req.file.filename}${ext}`;
-    inputFilePath = inputPath;
-
-    // Read file
-    const docxBuf = await fs.readFile(inputPath);
-
-    // Convert it to pdf format
-    let pdfBuf = await libre.convertAsync(docxBuf, ext, undefined);
-
-    // Here in done you have pdf file which you can save or transfer in another stream
-    await fs.writeFile(outputPath, pdfBuf);
-  } catch (error) {
-    console.log(error);
-  }
-  // return res.redirect('/download');
-  setTimeout(() => {
-    res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
-    res.setHeader("Content-Type", "file");
-    res.download(filepath, filename, (err) => {
-      if (err) {
-        console.error("Error downloading file:", err);
-      } else {
-        fs.unlink(`${filepath}`, (err) => {
-          if (err) {
-            console.error("Error deleting file:", err);
-          } else {
-            console.log("File deleted successfully");
-          }
+    const ext = await req.body.ext; 
+    const files =await req.files;
+    let inputPaths = [];
+    let outputPaths = [];
+    if (files.length != 0) {
+      for (const file of files) {
+        inputPaths.push(path.join(__dirname, `/upload/${file.filename}`));
+        outputPaths.push(
+          path.join(
+            __dirname,
+            `/download/${path.basename(
+              file.filename,
+              path.extname(file.filename)
+            )}${ext}`
+          )
+        );
+      }
+      console.log("Input Paths:", inputPaths);
+      console.log("Output Paths:", outputPaths);
+      const response=await fileConverter(inputPaths, outputPaths, ext);
+      if (response) {
+        return res.status(200).json({
+          message: response.message,
+          filepaths: response.files,
         });
-        fs.unlink(`${inputFilePath}`, (err) => {
-          if (err) {
-            console.error("Error deleting file:", err);
-          } else {
-            console.log("File deleted successfully");
-          }
+      } else {
+        return res.status(500).json({
+          message: "File conversion failed",
         });
       }
+    } else {
+      return res.status(400).json({
+        message: "No files uploaded",
+      });
+    }
+    // const inputPath = path.join(__dirname, `/upload/${req.file.filename}`);
+    // const outputPath = path.join(
+    //   __dirname,
+    //   `/download/${path.basename(
+    //     req.file.filename,
+    //     path.extname(req.file.filename)
+    //   )}${ext}`
+    // );
+    // const filepath = outputPath;
+    // const filename = `${req.file.filename}${ext}`;
+    // const inputFilePath = inputPath;
+
+    
+
+    // Here in done you have pdf file which you can save or transfer in another stream
+  } catch (error) {
+    return res.status(500).json({
+      message: "File conversion failed",
+      error: error.message,
     });
-  }, 5000);
+  }
 });
 
+app.post('/download_single_file',async(req,res)=>{
+  console.log(await req.body.filepath);
+  try {
+    const filepath=await req.body.filepath; 
+    const filename=path.basename(req.body.filepath) 
+          res.setHeader(
+              "Content-Disposition", 
+              `attachment; filename=${filename}` 
+            );
+            res.setHeader("Content-Type", "file");
+            res.download(filepath, filename, (err) => {
+              if (err) {
+                console.error("Error downloading file:", err);
+              } else {
+                fs.unlink(`${filepath}`, (err) => {
+                  if (err) {
+                    console.error("Error deleting file:", err);
+                  } else {
+                    console.log("File deleted successfully");
+                  }
+                });
+                
+              }
+            });
+  } catch (error) {
+    console.log(error)
+  }
+})
+app.post('/download_multiple_file',async(req,res)=>{
+  console.log(await req.body.filepaths);
+  try {
+    // return new Promise(async(resolve,reject) => {
+    const filepaths=await req.body.filepaths
+    for(let i=0;i<filepaths.length;i++){
+    const filename=path.basename(filepaths[i],path.extname(filepaths[i]))+".pdf";
+          res.setHeader(
+              "Content-Disposition", 
+              `attachment; filename=${filename}` 
+            );
+            res.setHeader("Content-Type", "file");
+             res.download(filepaths[i], filename, (err) => {
+              if (err) {
+                // reject(err);
+                console.error("Error downloading file:", err);
+              } else {
+                fs.unlink(`${filepaths[i]}`, (err) => {
+                  if (err) {
+                    // reject(err);
+                    console.error("Error deleting file:", err);
+                  } else {
+                    console.log("File deleted successfully");
+                  }
+                });
+                
+              }
+            });
+          }
+        // })
+  } catch (error) {
+    
+    console.log(error)
+  }
+})
 app.listen(port, () => {
   console.log(`hey from ${port}`);
 });
