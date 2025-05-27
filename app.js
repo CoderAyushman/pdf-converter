@@ -5,7 +5,7 @@ var cookieParser = require("cookie-parser");
 var logger = require("morgan");
 const port = process.env.PORT || 4000;
 const multer = require("multer");
-const fs = require("fs").promises;
+const fs = require("fs");
 var app = express();
 const libre = require("libreoffice-convert");
 const cors = require("cors");
@@ -53,62 +53,48 @@ const upload = multer({ storage: storage });
 // let inputFilePath;
 
 app.post("/upload", upload.array("files"), async (req, res) => {
-  // console.log(req.body);
-
-  // console.log(req.files);
-
   try {
-    const ext = await req.body.ext; 
-    const files =await req.files;
-    let inputPaths = [];
-    let outputPaths = [];
-    if (files.length != 0) {
-      for (let i=0; i<files.length; i++)  {
-        inputPaths.push(path.join(__dirname, `/upload/${files[i].filename}`));
-        outputPaths.push(
-          path.join(
-            __dirname,
-            `/download/${path.basename(
-              files[i].filename,
-              path.extname(files[i].filename)
-            )}${ext}`
-          )
-        );
-      }
-      console.log("Input Paths:", inputPaths);
-      console.log("Output Paths:", outputPaths);
-      const response=await fileConverter(inputPaths, outputPaths, ext);
-      if (response) {
-        return res.status(200).json({
-          message: response.message,
-          filepaths: response.files,
-        });
-      } else {
-        return res.status(500).json({
-          message: "File conversion failed",
-        });
-      }
-    } else {
-      return res.status(400).json({
-        message: "No files uploaded",
+    const ext = req.body.ext?.trim();
+    const files = req.files;
+    const inputPaths = [];
+    const outputPaths = [];
+
+    if (!ext) {
+      return res.status(400).json({ message: "No extension provided" });
+    }
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({ message: "No files uploaded" });
+    }
+
+    for (const file of files) {
+      const inputPath = path.join(__dirname, 'upload', file.filename);
+      const outputPath = path.join(
+        __dirname,
+        'download',
+        `${path.basename(file.filename, path.extname(file.filename))}${ext}`
+      );
+
+      inputPaths.push(inputPath);
+      outputPaths.push(outputPath);
+    }
+
+    console.log("Input Paths:", inputPaths);
+    console.log("Output Paths:", outputPaths);
+
+    const response = await fileConverter(inputPaths, outputPaths, ext);
+
+    if (response) {
+      return res.status(200).json({
+        message: response.message,
+        filepaths: response.files, // return absolute paths if you use them in download
       });
     }
-    // const inputPath = path.join(__dirname, `/upload/${req.file.filename}`);
-    // const outputPath = path.join(
-    //   __dirname,
-    //   `/download/${path.basename(
-    //     req.file.filename,
-    //     path.extname(req.file.filename)
-    //   )}${ext}`
-    // );
-    // const filepath = outputPath;
-    // const filename = `${req.file.filename}${ext}`;
-    // const inputFilePath = inputPath;
 
-    
+    return res.status(500).json({ message: "File conversion failed" });
 
-    // Here in done you have pdf file which you can save or transfer in another stream
   } catch (error) {
+    console.error("Upload error:", error);
     return res.status(500).json({
       message: "File conversion failed",
       error: error.message,
@@ -116,34 +102,52 @@ app.post("/upload", upload.array("files"), async (req, res) => {
   }
 });
 
-app.post('/download_single_file',async(req,res)=>{
-  console.log(await req.body.filepath);
+app.post('/download_single_file', async (req, res) => {
   try {
-    const filepath=await req.body.filepath; 
-    const filename=path.basename(req.body.filepath) 
-          res.setHeader(
-              "Content-Disposition", 
-              `attachment; filename=${filename}` 
-            );
-            res.setHeader("Content-Type", "file");
-            res.download(filepath, filename, (err) => {
-              if (err) {
-                console.error("Error downloading file:", err);
-              } else {
-                fs.unlink(`${filepath}`, (err) => {
-                  if (err) {
-                    console.error("Error deleting file:", err);
-                  } else {
-                    console.log("File deleted successfully");
-                  }
-                });
-                
-              }
-            });
+    const rawPath = req.body.filepath;
+
+    if (!rawPath) {
+      return res.status(400).json({ message: "Filepath not provided" });
+    }
+
+    // Prevent access outside allowed folders
+    const safeBase = path.join(__dirname, 'download');
+    const filepath = path.resolve(rawPath);
+
+    if (!filepath.startsWith(safeBase)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const filename = path.basename(filepath);
+
+    if (!fs.existsSync(filepath)) {
+      return res.status(404).json({ message: "File not found" });
+    }
+
+    res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
+    res.setHeader("Content-Type", "application/octet-stream");
+
+    res.download(filepath, filename, (err) => {
+      if (err) {
+        console.error("Download error:", err);
+      } else {
+        fs.unlink(filepath, (err) => {
+          if (err) {
+            console.error("Error deleting file:", err);
+          } else {
+            console.log("File deleted:", filename);
+          }
+        });
+      }
+    });
   } catch (error) {
-    console.log(error)
+    console.error("Download error:", error);
+    return res.status(500).json({
+      message: "Download failed",
+      error: error.message,
+    });
   }
-})
+});
 
 app.listen(port, () => {
   console.log(`hey from ${port}`);
