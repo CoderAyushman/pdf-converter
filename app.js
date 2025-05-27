@@ -63,14 +63,14 @@ app.post("/upload", upload.array("files"), async (req, res) => {
     let inputPaths = [];
     let outputPaths = [];
     if (files.length != 0) {
-      for (const file of files) {
-        inputPaths.push(path.join(__dirname, `/upload/${file.filename}`));
+      for (let i=0; i<files.length; i++)  {
+        inputPaths.push(path.join(__dirname, `/upload/${files[i].filename}`));
         outputPaths.push(
           path.join(
             __dirname,
             `/download/${path.basename(
-              file.filename,
-              path.extname(file.filename)
+              files[i].filename,
+              path.extname(files[i].filename)
             )}${ext}`
           )
         );
@@ -144,41 +144,7 @@ app.post('/download_single_file',async(req,res)=>{
     console.log(error)
   }
 })
-app.post('/download_multiple_file',async(req,res)=>{
-  console.log(await req.body.filepaths);
-  try {
-    // return new Promise(async(resolve,reject) => {
-    const filepaths=await req.body.filepaths
-    for(let i=0;i<filepaths.length;i++){
-    const filename=path.basename(filepaths[i],path.extname(filepaths[i]))+".pdf";
-          res.setHeader(
-              "Content-Disposition", 
-              `attachment; filename=${filename}` 
-            );
-            res.setHeader("Content-Type", "file");
-             res.download(filepaths[i], filename, (err) => {
-              if (err) {
-                // reject(err);
-                console.error("Error downloading file:", err);
-              } else {
-                fs.unlink(`${filepaths[i]}`, (err) => {
-                  if (err) {
-                    // reject(err);
-                    console.error("Error deleting file:", err);
-                  } else {
-                    console.log("File deleted successfully");
-                  }
-                });
-                
-              }
-            });
-          }
-        // })
-  } catch (error) {
-    
-    console.log(error)
-  }
-})
+
 app.listen(port, () => {
   console.log(`hey from ${port}`);
 });
