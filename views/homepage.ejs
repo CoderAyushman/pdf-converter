@@ -1,14 +1,91 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Word-to-pdf</title>
-    <link rel='stylesheet' href='/stylesheets/style.css' />
+    <title>files-to-pdf</title>
+    <link rel="stylesheet" href="/stylesheets/style.css" />
+    <script>
+      async function handleUpload(event) {
+        event.preventDefault();
+        const form = event.target;
+        const formData = new FormData(form);
+        const response = await fetch("http://localhost:4000/upload", {
+          method: "POST",
+          body:await formData,
+        });
+
+        if (!response.ok) {
+          alert("Upload failed!");
+          return;
+        }
+
+        const data = await response.json();
+        console.log("Response data:", data);
+
+        const resultContainer = document.getElementById("result");
+        resultContainer.innerHTML = ""; // clear previous result
+
+        if (Array.isArray(data.filepaths) && data.filepaths.length > 0) {
+          resultContainer.innerHTML = `<p>Files converted successfully!</p>`;
+
+          data.filepaths.forEach((filepath) => {
+            const fileName = filepath.replace(/\\/g, "/").split("/").pop();
+
+            const form = document.createElement("form");
+            form.action = "http://localhost:4000/download_single_file";
+            form.method = "POST";
+
+            const hiddenInput = document.createElement("input");
+            hiddenInput.type = "hidden";
+            hiddenInput.name = "filepath";
+            hiddenInput.value = filepath;
+
+            const button = document.createElement("button");
+            button.type = "submit";
+            button.textContent = `Download ${fileName}`;
+
+            form.appendChild(hiddenInput);
+            form.appendChild(button);
+
+            // Attach submit event listener to hide button on click
+            form.addEventListener("submit", (e) => {
+              // Hide the button immediately when clicked
+              button.style.display = "none";
+              // Form will submit normally
+            });
+
+            resultContainer.appendChild(form);
+          });
+        } else {
+          alert("No file paths returned!");
+        }
+      }
+    </script>
   </head>
   <body>
-    <h1>Select a docx File</h1>
-   <form action="/upload" method="POST" enctype="multipart/form-data" >
-    <input type="file" name="wordFile" accept=".docx" >
-    <button type="submit">Upload</button>
-   </form>
+    <h1>Select a File for Conversion</h1>
+    <form onsubmit="handleUpload(event)" enctype="multipart/form-data">
+      <label for="files">Choose a file:</label><br />
+      <input
+        multiple
+        type="file"
+        name="files"
+        id="files"
+        accept=".doc,.docx,.odt,.rtf,.txt,.xls,.xlsx,.ods,.csv,.ppt,.pptx,.odp,.html,.htm,.xml,.jpg,.jpeg,.png,.pdf"
+        required
+      /><br /><br />
+
+      <label for="ext">Convert to:</label><br />
+      <select name="ext" id="ext" required>
+        <option value=".pdf">PDF</option>
+        <option value=".docx">DOCX</option>
+        <option value=".html">HTML</option>
+        <option value=".txt">TXT</option>
+        <option value=".odt">ODT</option></select
+      ><br /><br />
+
+      <button type="submit">Upload and Convert</button>
+    </form>
+
+    <div id="result"></div>
   </body>
 </html>

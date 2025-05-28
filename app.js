@@ -9,20 +9,17 @@ const fs = require("fs");
 var app = express();
 const libre = require("libreoffice-convert");
 const cors = require("cors");
-const { error } = require("console");
 const fileConverter = require("./components/fileConverter");
 libre.convertAsync = require("util").promisify(libre.convert);
 // view engine setup
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
-
-app.use(
-  cors({
-    origin: "*",
-    methods: ["GET", "POST"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+const mime = require("mime-types");
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 app.use(logger("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -53,9 +50,10 @@ const upload = multer({ storage: storage });
 // let inputFilePath;
 
 app.post("/upload", upload.array("files"), async (req, res) => {
+  console.log("Files uploaded:",await req.files);
   try {
-    const ext = req.body.ext?.trim();
-    const files = req.files;
+    const ext =await req.body.ext
+    const files =await req.files;
     const inputPaths = [];
     const outputPaths = [];
 
@@ -85,6 +83,19 @@ app.post("/upload", upload.array("files"), async (req, res) => {
     const response = await fileConverter(inputPaths, outputPaths, ext);
 
     if (response) {
+      console.log("Conversion successful:", response);
+      setTimeout(() => {
+        // Delete input files after conversion
+        outputPaths?.forEach((outputPath) => {
+          fs.unlink(outputPath, (err) => {
+            if (err) {
+              console.error("Error deleting input file:", err);
+            } else {
+              console.log("Input file deleted:", outputPath);
+            }
+          });
+        });
+      }, 60000);
       return res.status(200).json({
         message: response.message,
         filepaths: response.files, // return absolute paths if you use them in download
@@ -114,6 +125,7 @@ app.post('/download_single_file', async (req, res) => {
     // Prevent access outside allowed folders
     const filepath =rawPath;
     const filename =rawPath.split("/").pop();
+    const fileMimeType =  mime.lookup(filepath) || "application/octet-stream";
     // const safeBase = path.join(__dirname, 'download');
     // const filepath = path.resolve(rawPath);
 
@@ -126,7 +138,7 @@ app.post('/download_single_file', async (req, res) => {
     }
 
     res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
-    res.setHeader("Content-Type", "application/octet-stream");
+    res.setHeader("Content-Type", fileMimeType);
 
     res.download(filepath, filename, (err) => {
       if (err) {
