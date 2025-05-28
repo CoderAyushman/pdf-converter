@@ -111,16 +111,17 @@ app.post('/download_single_file', async (req, res) => {
     }
 
     // Prevent access outside allowed folders
-    const safeBase = path.join(__dirname, 'download');
-    const filepath = path.resolve(rawPath);
+    // const safeBase = path.join(__dirname, 'download');
+    // const filepath = path.resolve(rawPath);
 
     if (!filepath.startsWith(safeBase)) {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    const filename = path.basename(filepath);
+    // const filename = path.basename(filepath);
+    const filename = `file.pdf`;
 
-    if (!fs.existsSync(filepath)) {
+    if (!fs.existsSync(rawPath)) {
       return res.status(404).json({ message: "File not found" });
     }
 
