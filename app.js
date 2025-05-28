@@ -105,6 +105,7 @@ app.post("/upload", upload.array("files"), async (req, res) => {
 app.post('/download_single_file', async (req, res) => {
   try {
     const rawPath = req.body.filepath;
+    console.log("Raw Path:", rawPath);
 
     if (!rawPath) {
       return res.status(400).json({ message: "Filepath not provided" });
@@ -116,9 +117,7 @@ app.post('/download_single_file', async (req, res) => {
     // const safeBase = path.join(__dirname, 'download');
     // const filepath = path.resolve(rawPath);
 
-    if (!filepath.startsWith(safeBase)) {
-      return res.status(403).json({ message: "Access denied" });
-    }
+    
 
     // const filename = path.basename(filepath);
 
