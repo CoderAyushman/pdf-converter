@@ -111,6 +111,8 @@ app.post('/download_single_file', async (req, res) => {
     }
 
     // Prevent access outside allowed folders
+    const filepath =rawPath;
+    const filename =rawPath.split("/").pop();
     // const safeBase = path.join(__dirname, 'download');
     // const filepath = path.resolve(rawPath);
 
@@ -119,7 +121,6 @@ app.post('/download_single_file', async (req, res) => {
     }
 
     // const filename = path.basename(filepath);
-    const filename = `file.pdf`;
 
     if (!fs.existsSync(rawPath)) {
       return res.status(404).json({ message: "File not found" });
