@@ -28,16 +28,16 @@ This is a **file conversion backend** built with **Node.js** that allows users t
 
 ## 📁 Folder Structure
 
-pdf-converter/
-├── upload/ # Uploaded input files
-├── download/ # Converted output PDFs
-├── components/
-│ └── fileConverter.js # Conversion logic using libreoffice-convert
-├── views/
-│ └── homepage.ejs # Web form to test file upload and conversion
-├── app.js # Main Express server
-├── Dockerfile # Docker config for LibreOffice
-└── README.md
+pdf-converter/                                                                                                                                                      
+├── upload/ # Uploaded input files                                                                                                                                  
+├── download/ # Converted output PDFs                                                                                                                               
+├── components/                                                                                                                                                     
+│ └── fileConverter.js # Conversion logic using libreoffice-convert                                                                                                 
+├── views/                                                                                                                                                          
+│ └── homepage.ejs # Web form to test file upload and conversion                                                                                                    
+├── app.js # Main Express server                                                                                                                                    
+├── Dockerfile # Docker config for LibreOffice                                                                                                                      
+└── README.md                                                                                                                                                       
 
 
 ---
